@@ -7,11 +7,13 @@ export interface Catequista {
   anoLetivo: string;
   disponivel: 'Sim' | 'Não';
   anoUltimaCatequese: string | number;
-  ehProfessor: 'Sim' | 'Não' | '';
-  temFormacaoPedagogia: 'Sim' | 'Não' | '';
-  expCriancasEspeciais: 'Sim' | 'Não' | '';
-  expAlfabetizacaoAdultos: 'Sim' | 'Não' | '';
-  expAlfabetizacaoCriancas: 'Sim' | 'Não' | '';
+  // Single-select categorical
+  ehProfessor: string;
+  temFormacaoPedagogia: string;
+  expCriancasEspeciais: string;
+  // Multi-select stored as comma-separated string
+  expAlfabetizacao: string;
+  faixaEtariaConforto: string;
 }
 
 export interface InqueritoForm {
@@ -20,27 +22,22 @@ export interface InqueritoForm {
   telefone: string;
   disponivel: 'Sim' | 'Não' | '';
   anoUltimaCatequese: string;
-  ehProfessor: 'Sim' | 'Não' | '';
-  temFormacaoPedagogia: 'Sim' | 'Não' | '';
-  expCriancasEspeciais: 'Sim' | 'Não' | '';
-  expAlfabetizacaoAdultos: 'Sim' | 'Não' | '';
-  expAlfabetizacaoCriancas: 'Sim' | 'Não' | '';
+  ehProfessor: string;
+  temFormacaoPedagogia: string;
+  expCriancasEspeciais: string;
+  expAlfabetizacao: string[];   // multi-select array in form
+  faixaEtariaConforto: string[]; // multi-select array in form
 }
 
 export interface Stats {
   total: number;
   disponiveis: number;
   naoDisponiveis: number;
-  professores: number;
-  professorePct: number;
-  pedagogia: number;
-  pedagogiaPct: number;
-  criancasEspeciais: number;
-  criancasEspeciaisPct: number;
-  alfAdultos: number;
-  alfAdultosPct: number;
-  alfCriancas: number;
-  alfCriancasPct: number;
+  ehProfessorDist: Record<string, number>;
+  pedagogiaDist: Record<string, number>;
+  criancasEspeciaisDist: Record<string, number>;
+  alfabetizacaoDist: Record<string, number>;
+  faixaEtariaDist: Record<string, number>;
   faixasInatividade: Record<string, number>;
 }
 

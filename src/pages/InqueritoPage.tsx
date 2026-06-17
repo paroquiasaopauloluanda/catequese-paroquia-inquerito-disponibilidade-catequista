@@ -3,12 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { api } from '../utils/apiClient';
 import type { Config, InqueritoForm } from '../types';
+import {
+  PROFESSOR_OPTIONS,
+  PEDAGOGIA_OPTIONS,
+  CRIANCAS_ESPECIAIS_OPTIONS,
+  ALFABETIZACAO_OPTIONS,
+  ALFABETIZACAO_EXCLUSIVE,
+  FAIXA_ETARIA_OPTIONS,
+} from '../constants/inqueritoOptions';
 
 const empty: InqueritoForm = {
   primeiroNome: '', ultimoNome: '', telefone: '',
   disponivel: '', anoUltimaCatequese: '',
-  ehProfessor: '', temFormacaoPedagogia: '',
-  expCriancasEspeciais: '', expAlfabetizacaoAdultos: '', expAlfabetizacaoCriancas: '',
+  ehProfessor: '', temFormacaoPedagogia: '', expCriancasEspeciais: '',
+  expAlfabetizacao: [], faixaEtariaConforto: [],
 };
 
 const inputStyle: React.CSSProperties = {
@@ -25,32 +33,119 @@ const labelStyle: React.CSSProperties = {
 
 const fieldStyle: React.CSSProperties = { marginBottom: 20 };
 
-const radioGroupStyle: React.CSSProperties = {
-  display: 'flex', gap: 16, marginTop: 4,
-};
-
+// Single-select radio with N options, vertical layout
 function RadioGroup({
-  name, value, onChange, disabled,
-}: { name: keyof InqueritoForm; value: string; onChange: (v: 'Sim' | 'Não') => void; disabled?: boolean }) {
+  name, value, onChange, options,
+}: {
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+}) {
   return (
-    <div style={radioGroupStyle}>
-      {(['Sim', 'Não'] as const).map(opt => (
-        <label key={opt} style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: 15, cursor: disabled ? 'not-allowed' : 'pointer',
-          padding: '10px 20px',
-          border: `2px solid ${value === opt ? '#1e3a5f' : '#c5cdd7'}`,
-          borderRadius: 8,
-          background: value === opt ? '#eef2f8' : '#fff',
-          opacity: disabled ? 0.5 : 1,
-        }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+      {options.map(opt => (
+        <label
+          key={opt}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            fontSize: 14, cursor: 'pointer',
+            padding: '10px 14px',
+            border: `2px solid ${value === opt ? '#1e3a5f' : '#c5cdd7'}`,
+            borderRadius: 8,
+            background: value === opt ? '#eef2f8' : '#fff',
+            lineHeight: 1.4,
+          }}
+        >
           <input
             type="radio"
             name={name}
             value={opt}
             checked={value === opt}
             onChange={() => onChange(opt)}
-            disabled={disabled}
+            style={{ accentColor: '#1e3a5f', width: 16, height: 16, marginTop: 2, flexShrink: 0 }}
+          />
+          {opt}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Multi-select checkboxes with optional exclusive option
+function CheckboxGroup({
+  values, onChange, options, exclusive,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: readonly string[];
+  exclusive?: string; // value that is mutually exclusive with others
+}) {
+  const toggle = (opt: string) => {
+    if (exclusive && opt === exclusive) {
+      onChange(values.includes(opt) ? [] : [opt]);
+      return;
+    }
+    let next = values.includes(opt)
+      ? values.filter(v => v !== opt)
+      : [...values.filter(v => v !== exclusive), opt];
+    onChange(next);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+      {options.map(opt => {
+        const checked = values.includes(opt);
+        return (
+          <label
+            key={opt}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              fontSize: 14, cursor: 'pointer',
+              padding: '10px 14px',
+              border: `2px solid ${checked ? '#1e3a5f' : '#c5cdd7'}`,
+              borderRadius: 8,
+              background: checked ? '#eef2f8' : '#fff',
+              lineHeight: 1.4,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => toggle(opt)}
+              style={{ accentColor: '#1e3a5f', width: 16, height: 16, marginTop: 2, flexShrink: 0 }}
+            />
+            {opt}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+// Simple Sim/Não radio (for disponibilidade)
+function SimNaoGroup({ name, value, onChange }: { name: string; value: string; onChange: (v: 'Sim' | 'Não') => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+      {(['Sim', 'Não'] as const).map(opt => (
+        <label
+          key={opt}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 15, cursor: 'pointer',
+            padding: '10px 24px',
+            border: `2px solid ${value === opt ? '#1e3a5f' : '#c5cdd7'}`,
+            borderRadius: 8,
+            background: value === opt ? '#eef2f8' : '#fff',
+            flex: 1, justifyContent: 'center',
+          }}
+        >
+          <input
+            type="radio"
+            name={name}
+            value={opt}
+            checked={value === opt}
+            onChange={() => onChange(opt)}
             style={{ accentColor: '#1e3a5f', width: 16, height: 16 }}
           />
           {opt}
@@ -92,11 +187,12 @@ export default function InqueritoPage() {
       if (!form.anoUltimaCatequese) return 'Indique o ano em que ministrou catequese pela última vez.';
       const ano = parseInt(form.anoUltimaCatequese);
       if (isNaN(ano) || ano > new Date().getFullYear()) return 'O ano não pode ser superior ao ano atual.';
-      if (!form.ehProfessor) return 'Indique se é professor.';
-      if (!form.temFormacaoPedagogia) return 'Indique se tem formação em pedagogia.';
-      if (!form.expCriancasEspeciais) return 'Indique se tem experiência com crianças especiais.';
-      if (!form.expAlfabetizacaoAdultos) return 'Indique se tem experiência com alfabetização de adultos.';
-      if (!form.expAlfabetizacaoCriancas) return 'Indique se tem experiência com alfabetização de crianças.';
+      if (ano < 1950) return 'Ano inválido.';
+      if (!form.ehProfessor) return 'Indique o seu perfil profissional.';
+      if (!form.temFormacaoPedagogia) return 'Indique a sua formação em pedagogia.';
+      if (!form.expCriancasEspeciais) return 'Indique a sua experiência com crianças especiais.';
+      if (form.expAlfabetizacao.length === 0) return 'Indique a sua experiência em alfabetização.';
+      if (form.faixaEtariaConforto.length === 0) return 'Indique com que faixas etárias se sente mais confortável.';
     }
     return '';
   };
@@ -116,18 +212,19 @@ export default function InqueritoPage() {
         return;
       }
 
+      const eDisp = form.disponivel === 'Sim';
       const payload = {
         primeiroNome: form.primeiroNome.trim(),
         ultimoNome: form.ultimoNome.trim(),
         telefone: form.telefone.replace(/\s/g, ''),
         anoLetivo: config.anoLetivo,
-        disponivel: form.disponivel === 'Sim',
-        anoUltimaCatequese: form.disponivel === 'Sim' ? parseInt(form.anoUltimaCatequese) : null,
-        ehProfessor: form.disponivel === 'Sim' ? form.ehProfessor === 'Sim' : null,
-        temFormacaoPedagogia: form.disponivel === 'Sim' ? form.temFormacaoPedagogia === 'Sim' : null,
-        expCriancasEspeciais: form.disponivel === 'Sim' ? form.expCriancasEspeciais === 'Sim' : null,
-        expAlfabetizacaoAdultos: form.disponivel === 'Sim' ? form.expAlfabetizacaoAdultos === 'Sim' : null,
-        expAlfabetizacaoCriancas: form.disponivel === 'Sim' ? form.expAlfabetizacaoCriancas === 'Sim' : null,
+        disponivel: eDisp,
+        anoUltimaCatequese: eDisp ? parseInt(form.anoUltimaCatequese) : null,
+        ehProfessor: eDisp ? form.ehProfessor : '',
+        temFormacaoPedagogia: eDisp ? form.temFormacaoPedagogia : '',
+        expCriancasEspeciais: eDisp ? form.expCriancasEspeciais : '',
+        expAlfabetizacao: eDisp ? form.expAlfabetizacao.join(', ') : '',
+        faixaEtariaConforto: eDisp ? form.faixaEtariaConforto.join(', ') : '',
       };
 
       const res = await api.submit(payload);
@@ -165,7 +262,7 @@ export default function InqueritoPage() {
     <div style={{ minHeight: '100dvh', background: '#f5f7fa', display: 'flex', flexDirection: 'column' }}>
       <Header subtitle="Inquérito de Disponibilidade" />
 
-      <div style={{ padding: '24px 16px 40px', maxWidth: 520, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ padding: '24px 16px 40px', maxWidth: 560, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         <div style={{
           background: '#fff', borderRadius: 12, padding: '28px 24px',
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
@@ -179,46 +276,30 @@ export default function InqueritoPage() {
             {/* Parte 1 */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Primeiro nome *</label>
-              <input
-                style={inputStyle}
-                type="text"
-                value={form.primeiroNome}
+              <input style={inputStyle} type="text" value={form.primeiroNome}
                 onChange={e => set('primeiroNome', e.target.value)}
-                placeholder="O seu primeiro nome"
-                autoComplete="given-name"
-              />
+                placeholder="O seu primeiro nome" autoComplete="given-name" />
             </div>
 
             <div style={fieldStyle}>
               <label style={labelStyle}>Sobrenome *</label>
-              <input
-                style={inputStyle}
-                type="text"
-                value={form.ultimoNome}
+              <input style={inputStyle} type="text" value={form.ultimoNome}
                 onChange={e => set('ultimoNome', e.target.value)}
-                placeholder="O seu último nome"
-                autoComplete="family-name"
-              />
+                placeholder="O seu último nome" autoComplete="family-name" />
             </div>
 
             <div style={fieldStyle}>
               <label style={labelStyle}>Telefone *</label>
-              <input
-                style={inputStyle}
-                type="tel"
-                value={form.telefone}
+              <input style={inputStyle} type="tel" value={form.telefone}
                 onChange={e => set('telefone', e.target.value)}
-                placeholder="912 345 678"
-                inputMode="numeric"
-                autoComplete="tel"
-              />
+                placeholder="912 345 678" inputMode="numeric" autoComplete="tel" />
             </div>
 
             <div style={fieldStyle}>
               <label style={labelStyle}>
                 Está disponível para ministrar catequese no ano letivo {config.anoLetivo}? *
               </label>
-              <RadioGroup name="disponivel" value={form.disponivel} onChange={v => set('disponivel', v)} />
+              <SimNaoGroup name="disponivel" value={form.disponivel} onChange={v => set('disponivel', v)} />
             </div>
 
             {/* Parte 2 — só se disponível */}
@@ -231,34 +312,66 @@ export default function InqueritoPage() {
 
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Ano em que ministrou catequese pela última vez *</label>
-                  <input
-                    style={inputStyle}
-                    type="number"
-                    value={form.anoUltimaCatequese}
+                  <input style={inputStyle} type="number" value={form.anoUltimaCatequese}
                     onChange={e => set('anoUltimaCatequese', e.target.value)}
                     placeholder={String(new Date().getFullYear())}
-                    min={1950}
-                    max={new Date().getFullYear()}
-                    inputMode="numeric"
+                    min={1950} max={new Date().getFullYear()} inputMode="numeric" />
+                </div>
+
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>É Professor? *</label>
+                  <RadioGroup
+                    name="ehProfessor"
+                    value={form.ehProfessor}
+                    onChange={v => set('ehProfessor', v)}
+                    options={PROFESSOR_OPTIONS}
                   />
                 </div>
 
-                {([
-                  { key: 'ehProfessor', label: 'É professor de profissão?' },
-                  { key: 'temFormacaoPedagogia', label: 'Tem formação em pedagogia?' },
-                  { key: 'expCriancasEspeciais', label: 'Tem experiência com crianças especiais (autismo e outros)?' },
-                  { key: 'expAlfabetizacaoAdultos', label: 'Tem experiência com alfabetização de adultos?' },
-                  { key: 'expAlfabetizacaoCriancas', label: 'Tem experiência com alfabetização de crianças?' },
-                ] as { key: keyof InqueritoForm; label: string }[]).map(f => (
-                  <div key={f.key} style={fieldStyle}>
-                    <label style={labelStyle}>{f.label} *</label>
-                    <RadioGroup
-                      name={f.key}
-                      value={form[f.key]}
-                      onChange={v => set(f.key, v)}
-                    />
-                  </div>
-                ))}
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Tem Formação em Pedagogia? *</label>
+                  <RadioGroup
+                    name="temFormacaoPedagogia"
+                    value={form.temFormacaoPedagogia}
+                    onChange={v => set('temFormacaoPedagogia', v)}
+                    options={PEDAGOGIA_OPTIONS}
+                  />
+                </div>
+
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Tem Experiência com Crianças Especiais? *</label>
+                  <RadioGroup
+                    name="expCriancasEspeciais"
+                    value={form.expCriancasEspeciais}
+                    onChange={v => set('expCriancasEspeciais', v)}
+                    options={CRIANCAS_ESPECIAIS_OPTIONS}
+                  />
+                </div>
+
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Experiência em Alfabetização? *</label>
+                  <p style={{ fontSize: 12, color: '#777', marginBottom: 6, marginTop: -2 }}>
+                    Seleccione todas as que se aplicam.
+                  </p>
+                  <CheckboxGroup
+                    values={form.expAlfabetizacao}
+                    onChange={v => set('expAlfabetizacao', v)}
+                    options={ALFABETIZACAO_OPTIONS}
+                    exclusive={ALFABETIZACAO_EXCLUSIVE}
+                  />
+                </div>
+
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Com que faixa etária se sente mais confortável? *</label>
+                  <p style={{ fontSize: 12, color: '#777', marginBottom: 6, marginTop: -2 }}>
+                    Seleccione todas as que se aplicam.
+                  </p>
+                  <CheckboxGroup
+                    values={form.faixaEtariaConforto}
+                    onChange={v => set('faixaEtariaConforto', v)}
+                    options={FAIXA_ETARIA_OPTIONS}
+                  />
+                </div>
               </>
             )}
 
@@ -279,8 +392,8 @@ export default function InqueritoPage() {
                 width: '100%', padding: '14px',
                 background: submitting || !form.disponivel ? '#9bb3cc' : '#1e3a5f',
                 color: '#fff', border: 'none', borderRadius: 8,
-                fontSize: 16, fontWeight: 700, cursor: submitting || !form.disponivel ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
+                fontSize: 16, fontWeight: 700,
+                cursor: submitting || !form.disponivel ? 'not-allowed' : 'pointer',
               }}
             >
               {submitting ? 'A enviar…' : 'Submeter'}
