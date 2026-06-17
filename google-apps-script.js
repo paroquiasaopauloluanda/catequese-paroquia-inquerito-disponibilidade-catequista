@@ -94,7 +94,28 @@ function ensureSheet(ss, name, headers) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
+    return sheet;
   }
+
+  // Sync header row when schema changes (rename/add columns, never removes data)
+  const lastCol = sheet.getLastColumn();
+  const existingHeaders = lastCol > 0
+    ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String)
+    : [];
+
+  // Add missing columns to the right
+  headers.forEach((h, i) => {
+    if (i >= lastCol) {
+      sheet.getRange(1, i + 1).setValue(h);
+    }
+  });
+
+  // Rename headers that changed (same position, different name)
+  const needsRename = headers.some((h, i) => existingHeaders[i] !== h);
+  if (needsRename) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
   return sheet;
 }
 
