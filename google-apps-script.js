@@ -3,10 +3,8 @@
 // Google Apps Script (doGet only, payload via base64)
 // ============================================================
 
-const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const SHEET_CATEQUISTAS = 'Catequistas';
 const SHEET_CONFIG = 'Configuracao';
-const SHEET_USERS = 'Utilizadores';
 
 const ADMIN_USER = 'root';
 const ADMIN_PASS = 'rootroot';
@@ -14,49 +12,25 @@ const SESSION_TOKEN = 'sigc-admin-token-2026';
 
 function doGet(e) {
   const action = e.parameter.action || '';
-  const payload = e.parameter.payload ? JSON.parse(Utilities.newBlob(Utilities.base64Decode(e.parameter.payload)).getDataAsString()) : {};
+  const payload = e.parameter.payload
+    ? JSON.parse(Utilities.newBlob(Utilities.base64Decode(e.parameter.payload)).getDataAsString())
+    : {};
   const token = e.parameter.token || '';
 
   try {
     let result;
-
     switch (action) {
-      case 'submit':
-        result = submitInquerito(payload);
-        break;
-      case 'checkDuplicate':
-        result = checkDuplicate(payload.primeiroNome, payload.ultimoNome);
-        break;
-      case 'login':
-        result = login(payload.username, payload.password);
-        break;
-      case 'getAll':
-        requireAuth(token);
-        result = getAll();
-        break;
-      case 'getStats':
-        requireAuth(token);
-        result = getStats();
-        break;
-      case 'deleteRecord':
-        requireAuth(token);
-        result = deleteRecord(payload.id);
-        break;
-      case 'updateRecord':
-        requireAuth(token);
-        result = updateRecord(payload.id, payload.data);
-        break;
-      case 'getConfig':
-        result = getConfig();
-        break;
-      case 'setConfig':
-        requireAuth(token);
-        result = setConfig(payload);
-        break;
-      default:
-        result = { ok: false, error: 'Acção desconhecida' };
+      case 'submit':        result = submitInquerito(payload); break;
+      case 'checkDuplicate': result = checkDuplicate(payload.primeiroNome, payload.ultimoNome); break;
+      case 'login':         result = login(payload.username, payload.password); break;
+      case 'getAll':        requireAuth(token); result = getAll(); break;
+      case 'getStats':      requireAuth(token); result = getStats(); break;
+      case 'deleteRecord':  requireAuth(token); result = deleteRecord(payload.id); break;
+      case 'updateRecord':  requireAuth(token); result = updateRecord(payload.id, payload.data); break;
+      case 'getConfig':     result = getConfig(); break;
+      case 'setConfig':     requireAuth(token); result = setConfig(payload); break;
+      default:              result = { ok: false, error: 'Acção desconhecida' };
     }
-
     return jsonResponse(result);
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });
@@ -102,9 +76,7 @@ function setConfig(payload) {
   const sheet = ss.getSheetByName(SHEET_CONFIG);
   sheet.clearContents();
   sheet.appendRow(['chave', 'valor']);
-  Object.keys(payload).forEach(key => {
-    sheet.appendRow([key, payload[key]]);
-  });
+  Object.keys(payload).forEach(key => sheet.appendRow([key, payload[key]]));
   return { ok: true };
 }
 
@@ -113,8 +85,8 @@ function setConfig(payload) {
 const CATEQUISTAS_HEADERS = [
   'id', 'dataRegisto', 'primeiroNome', 'ultimoNome', 'telefone',
   'anoLetivo', 'disponivel', 'anoUltimaCatequese',
-  'ehProfessor', 'temFormacaoPedagogia',
-  'expCriancasEspeciais', 'expAlfabetizacaoAdultos', 'expAlfabetizacaoCriancas'
+  'ehProfessor', 'temFormacaoPedagogia', 'expCriancasEspeciais',
+  'expAlfabetizacao', 'faixaEtariaConforto'
 ];
 
 function ensureSheet(ss, name, headers) {
@@ -131,15 +103,13 @@ function checkDuplicate(primeiroNome, ultimoNome) {
   const sheet = ss.getSheetByName(SHEET_CATEQUISTAS);
   if (!sheet) return { ok: true, exists: false };
   const data = sheet.getDataRange().getValues();
-  const nomeLower = (primeiroNome || '').trim().toLowerCase();
-  const sobrenomeLower = (ultimoNome || '').trim().toLowerCase();
+  const n1 = (primeiroNome || '').trim().toLowerCase();
+  const n2 = (ultimoNome || '').trim().toLowerCase();
   for (let i = 1; i < data.length; i++) {
     if (
-      (data[i][2] || '').toString().trim().toLowerCase() === nomeLower &&
-      (data[i][3] || '').toString().trim().toLowerCase() === sobrenomeLower
-    ) {
-      return { ok: true, exists: true };
-    }
+      (data[i][2] || '').toString().trim().toLowerCase() === n1 &&
+      (data[i][3] || '').toString().trim().toLowerCase() === n2
+    ) return { ok: true, exists: true };
   }
   return { ok: true, exists: false };
 }
@@ -154,21 +124,21 @@ function submitInquerito(payload) {
 
   const id = Utilities.getUuid();
   const timestamp = new Date().toISOString();
+  const d = !!payload.disponivel;
 
   sheet.appendRow([
-    id,
-    timestamp,
+    id, timestamp,
     payload.primeiroNome || '',
     payload.ultimoNome || '',
     payload.telefone || '',
     payload.anoLetivo || '',
-    payload.disponivel ? 'Sim' : 'Não',
-    payload.anoUltimaCatequese || '',
-    payload.disponivel ? (payload.ehProfessor ? 'Sim' : 'Não') : '',
-    payload.disponivel ? (payload.temFormacaoPedagogia ? 'Sim' : 'Não') : '',
-    payload.disponivel ? (payload.expCriancasEspeciais ? 'Sim' : 'Não') : '',
-    payload.disponivel ? (payload.expAlfabetizacaoAdultos ? 'Sim' : 'Não') : '',
-    payload.disponivel ? (payload.expAlfabetizacaoCriancas ? 'Sim' : 'Não') : '',
+    d ? 'Sim' : 'Não',
+    d ? (payload.anoUltimaCatequese || '') : '',
+    d ? (payload.ehProfessor || '') : '',
+    d ? (payload.temFormacaoPedagogia || '') : '',
+    d ? (payload.expCriancasEspeciais || '') : '',
+    d ? (payload.expAlfabetizacao || '') : '',
+    d ? (payload.faixaEtariaConforto || '') : '',
   ]);
 
   return { ok: true, id };
@@ -196,19 +166,33 @@ function getStats() {
   const records = all.records;
   const total = records.length;
   const disponiveis = records.filter(r => r.disponivel === 'Sim');
-  const naoDisponiveis = records.filter(r => r.disponivel === 'Não');
   const d = disponiveis.length;
 
-  const pct = (n) => d > 0 ? Math.round((n / d) * 100) : 0;
+  // Count distribution for single-select field
+  function dist(field) {
+    const out = {};
+    disponiveis.forEach(r => {
+      const v = (r[field] || '').toString().trim();
+      if (v) out[v] = (out[v] || 0) + 1;
+    });
+    return out;
+  }
 
-  const professores = disponiveis.filter(r => r.ehProfessor === 'Sim').length;
-  const pedagogia = disponiveis.filter(r => r.temFormacaoPedagogia === 'Sim').length;
-  const criancasEspeciais = disponiveis.filter(r => r.expCriancasEspeciais === 'Sim').length;
-  const alfAdultos = disponiveis.filter(r => r.expAlfabetizacaoAdultos === 'Sim').length;
-  const alfCriancas = disponiveis.filter(r => r.expAlfabetizacaoCriancas === 'Sim').length;
+  // Count distribution for multi-select field (comma-separated)
+  function distMulti(field) {
+    const out = {};
+    disponiveis.forEach(r => {
+      const v = (r[field] || '').toString().trim();
+      if (!v) return;
+      v.split(',').forEach(part => {
+        const k = part.trim();
+        if (k) out[k] = (out[k] || 0) + 1;
+      });
+    });
+    return out;
+  }
 
   const anoAtual = new Date().getFullYear();
-
   const faixas = { '0': 0, '1-2': 0, '3-5': 0, '6-10': 0, '10+': 0 };
   disponiveis.forEach(r => {
     const ano = parseInt(r.anoUltimaCatequese) || 0;
@@ -226,12 +210,12 @@ function getStats() {
     stats: {
       total,
       disponiveis: d,
-      naoDisponiveis: naoDisponiveis.length,
-      professores, professorePct: pct(professores),
-      pedagogia, pedagogiaPct: pct(pedagogia),
-      criancasEspeciais, criancasEspeciaisPct: pct(criancasEspeciais),
-      alfAdultos, alfAdultosPct: pct(alfAdultos),
-      alfCriancas, alfCriancasPct: pct(alfCriancas),
+      naoDisponiveis: total - d,
+      ehProfessorDist: dist('ehProfessor'),
+      pedagogiaDist: dist('temFormacaoPedagogia'),
+      criancasEspeciaisDist: dist('expCriancasEspeciais'),
+      alfabetizacaoDist: distMulti('expAlfabetizacao'),
+      faixaEtariaDist: distMulti('faixaEtariaConforto'),
       faixasInatividade: faixas,
     }
   };
@@ -243,10 +227,7 @@ function deleteRecord(id) {
   if (!sheet) return { ok: false, error: 'Sheet não encontrada' };
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
-      sheet.deleteRow(i + 1);
-      return { ok: true };
-    }
+    if (data[i][0] === id) { sheet.deleteRow(i + 1); return { ok: true }; }
   }
   return { ok: false, error: 'Registo não encontrado' };
 }

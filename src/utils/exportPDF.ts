@@ -7,52 +7,39 @@ const ACCENT_COLOR: [number, number, number] = [212, 175, 55];
 const ROW_ODD: [number, number, number] = [245, 248, 252];
 const ROW_EVEN: [number, number, number] = [255, 255, 255];
 
+export function calcAnosInatividade(anoUltimaCatequese: string | number): string {
+  const ano = parseInt(String(anoUltimaCatequese));
+  if (isNaN(ano) || ano <= 0) return '—';
+  return String(new Date().getFullYear() - ano);
+}
+
 function addInstitutionalHeader(doc: jsPDF, title: string, total?: number) {
   const pageW = doc.internal.pageSize.getWidth();
 
   doc.setFillColor(...HEADER_COLOR);
   doc.rect(0, 0, pageW, 38, 'F');
-
   doc.setFillColor(...ACCENT_COLOR);
   doc.rect(0, 38, pageW, 2, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.text('Vigararia de Fátima', pageW / 2, 10, { align: 'center' });
-
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
   doc.text('Paróquia de São Paulo', pageW / 2, 19, { align: 'center' });
-
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.text('Comissão de Catequese', pageW / 2, 27, { align: 'center' });
 
   doc.setTextColor(50, 50, 50);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
   doc.text(title, pageW / 2, 52, { align: 'center' });
 
-  const today = new Date().toLocaleDateString('pt-PT', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  const today = new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 100, 100);
   doc.text(`Gerado em ${today}`, 14, 60);
-
-  if (total !== undefined) {
-    doc.text(`Total: ${total} registos`, pageW - 14, 60, { align: 'right' });
-  }
+  if (total !== undefined) doc.text(`Total: ${total} registos`, pageW - 14, 60, { align: 'right' });
 
   return 66;
-}
-
-export function calcAnosInatividade(anoUltimaCatequese: string | number): string {
-  const ano = parseInt(String(anoUltimaCatequese));
-  if (isNaN(ano) || ano <= 0) return '—';
-  return String(new Date().getFullYear() - ano);
 }
 
 function catequistaColumns(showExtra?: boolean) {
@@ -69,9 +56,9 @@ function catequistaColumns(showExtra?: boolean) {
       { header: 'Anos Inat.', dataKey: 'anosInatividade' },
       { header: 'Professor', dataKey: 'ehProfessor' },
       { header: 'Pedagogia', dataKey: 'temFormacaoPedagogia' },
-      { header: 'Cri. Especiais', dataKey: 'expCriancasEspeciais' },
-      { header: 'Alf. Adultos', dataKey: 'expAlfabetizacaoAdultos' },
-      { header: 'Alf. Crianças', dataKey: 'expAlfabetizacaoCriancas' },
+      { header: 'Cr. Especiais', dataKey: 'expCriancasEspeciais' },
+      { header: 'Alfabetização', dataKey: 'expAlfabetizacao' },
+      { header: 'Faixa Etária', dataKey: 'faixaEtariaConforto' },
     );
   }
   return base;
@@ -89,8 +76,8 @@ function toRows(records: Catequista[]) {
     ehProfessor: r.ehProfessor || '—',
     temFormacaoPedagogia: r.temFormacaoPedagogia || '—',
     expCriancasEspeciais: r.expCriancasEspeciais || '—',
-    expAlfabetizacaoAdultos: r.expAlfabetizacaoAdultos || '—',
-    expAlfabetizacaoCriancas: r.expAlfabetizacaoCriancas || '—',
+    expAlfabetizacao: r.expAlfabetizacao || '—',
+    faixaEtariaConforto: r.faixaEtariaConforto || '—',
   }));
 }
 
@@ -101,83 +88,89 @@ function buildDoc(title: string, records: Catequista[], showExtra = true) {
     startY,
     columns: catequistaColumns(showExtra),
     body: toRows(records),
-    styles: { fontSize: 8, cellPadding: 3 },
+    styles: { fontSize: 7, cellPadding: 2.5 },
     headStyles: { fillColor: HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: ROW_ODD },
     bodyStyles: { fillColor: ROW_EVEN },
-    margin: { left: 10, right: 10 },
+    margin: { left: 8, right: 8 },
   });
   return doc;
 }
 
 export function exportRelatorioPDF(title: string, records: Catequista[], showExtra = true) {
   const doc = buildDoc(title, records, showExtra);
-  doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
+  doc.save(`${title.replace(/[^a-zA-Z0-9À-ÿ]+/g, '_')}.pdf`);
 }
 
 export function exportStatsPDF(stats: Stats, anoLetivo: string) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const startY = addInstitutionalHeader(doc, `Estatísticas — ${anoLetivo}`);
   const pageW = doc.internal.pageSize.getWidth();
+  let y = addInstitutionalHeader(doc, `Estatísticas — ${anoLetivo}`);
 
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 95);
-  doc.text('Resumo Geral', 14, startY + 6);
+  const section = (title: string) => {
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 58, 95);
+    doc.text(title, 14, y);
+    y += 4;
+  };
 
-  const summaryData = [
-    ['Total de inscritos', String(stats.total)],
-    ['Disponíveis', `${stats.disponiveis} (${Math.round((stats.disponiveis / stats.total) * 100) || 0}%)`],
-    ['Não disponíveis', `${stats.naoDisponiveis} (${Math.round((stats.naoDisponiveis / stats.total) * 100) || 0}%)`],
-  ];
+  const distTable = (data: Record<string, number>, startY: number, rightHalf = false) => {
+    const margin = rightHalf ? { left: pageW / 2 + 5, right: 14 } : { left: 14, right: pageW / 2 + 5 };
+    autoTable(doc, {
+      startY,
+      head: [['Opção', 'Nº']],
+      body: Object.entries(data).map(([k, v]) => [k, String(v)]),
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
+      alternateRowStyles: { fillColor: ROW_ODD },
+      columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } },
+      margin,
+    });
+    return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  };
 
+  // Summary
+  section('Resumo Geral');
   autoTable(doc, {
-    startY: startY + 10,
-    body: summaryData,
+    startY: y,
+    body: [
+      ['Total de inscritos', String(stats.total)],
+      ['Disponíveis', `${stats.disponiveis} (${Math.round((stats.disponiveis / stats.total) * 100) || 0}%)`],
+      ['Não disponíveis', `${stats.naoDisponiveis} (${Math.round((stats.naoDisponiveis / stats.total) * 100) || 0}%)`],
+    ],
     styles: { fontSize: 10, cellPadding: 4 },
     headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
     alternateRowStyles: { fillColor: ROW_ODD },
     columnStyles: { 1: { fontStyle: 'bold', halign: 'right' } },
     margin: { left: 14, right: 14 },
   });
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
-  const afterSummary = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 95);
-  doc.text('Indicadores de Experiência (sobre disponíveis)', 14, afterSummary);
+  // Two-column layout for distributions
+  section('Perfil dos Disponíveis');
+  const yBefore = y;
+  const y1 = distTable(stats.ehProfessorDist, y, false);
+  const y2 = distTable(stats.pedagogiaDist, y, true);
+  y = Math.max(y1, y2) + 8;
 
-  const expData = [
-    ['Professores', String(stats.professores), `${stats.professorePct}%`],
-    ['Formação em pedagogia', String(stats.pedagogia), `${stats.pedagogiaPct}%`],
-    ['Exp. crianças especiais', String(stats.criancasEspeciais), `${stats.criancasEspeciaisPct}%`],
-    ['Exp. alfabetização adultos', String(stats.alfAdultos), `${stats.alfAdultosPct}%`],
-    ['Exp. alfabetização crianças', String(stats.alfCriancas), `${stats.alfCriancasPct}%`],
-  ];
+  section('Exp. Crianças Especiais');
+  const y3 = distTable(stats.criancasEspeciaisDist, y, false);
+  section('Alfabetização');
+  const y4 = distTable(stats.alfabetizacaoDist, yBefore, true);
+  y = Math.max(y3, y4) + 8;
 
+  section('Faixa Etária de Conforto');
+  distTable(stats.faixaEtariaDist, y, false);
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+  section('Distribuição por Anos de Inatividade');
+  const faixaData = Object.entries(stats.faixasInatividade)
+    .map(([k, v]) => [k === '0' ? 'Ativo (0 anos)' : `${k} anos`, String(v)]);
   autoTable(doc, {
-    startY: afterSummary + 4,
-    head: [['Indicador', 'Nº', '%']],
-    body: expData,
-    styles: { fontSize: 10, cellPadding: 4 },
-    headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
-    alternateRowStyles: { fillColor: ROW_ODD },
-    columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center', fontStyle: 'bold' } },
-    margin: { left: 14, right: pageW / 2 + 5 },
-  });
-
-  const afterExp = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 95);
-  doc.text('Distribuição por Anos de Inatividade', 14, afterExp);
-
-  const faixas = stats.faixasInatividade;
-  const faixaData = Object.entries(faixas).map(([k, v]) => [k === '0' ? 'Ativo (0 anos)' : `${k} anos`, String(v)]);
-
-  autoTable(doc, {
-    startY: afterExp + 4,
+    startY: y,
     head: [['Faixa', 'Nº']],
     body: faixaData,
-    styles: { fontSize: 10, cellPadding: 4 },
+    styles: { fontSize: 9, cellPadding: 3 },
     headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
     alternateRowStyles: { fillColor: ROW_ODD },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } },
